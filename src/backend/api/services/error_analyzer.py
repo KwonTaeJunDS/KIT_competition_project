@@ -14,20 +14,22 @@ _analyzer = ErrorAnalyzerBase()
 
 
 def analyze_error(question_dict: dict, student_answer_num: int) -> dict:
-    """오답 분석. LLM → rule-based → pure fallback 순으로 시도."""
-    # ── Phase 5: LLM 우선 ──────────────────────────────────────
+    """오답 분석. GraphRAG(Gemma+그래프) → rule-based → pure fallback 순으로 시도."""
+    # ── GraphRAG: FAISS + 온톨로지 + Gemma (Gemma 실패 시 내부 규칙 기반 fallback) ──
     try:
-        from api.services.llm_analyzer import analyze_with_llm
-        llm_result = analyze_with_llm(question_dict, student_answer_num)
-        if llm_result:
-            return _merge_with_fallbacks(question_dict, student_answer_num, llm_result)
+        from api.services.graphrag import graphrag_available, get_graphrag
+        if graphrag_available():
+            rag     = get_graphrag()
+            result  = rag.analyze_wrong_answer(question_dict, student_answer_num)
+            if result:
+                return _merge_with_fallbacks(question_dict, student_answer_num, result)
     except Exception:
-        logger.debug("LLM analyzer import/call failed; falling back to rule-based.")
+        logger.debug("GraphRAG analysis failed; falling back to rule-based.")
 
     # ── rule-based fallback ────────────────────────────────────
     try:
-        rag = get_rag()
-        analysis = _analyzer.analyze(question_dict, student_answer_num, rag)
+        rag_svc  = get_rag()
+        analysis = _analyzer.analyze(question_dict, student_answer_num, rag_svc)
         return _merge_with_fallbacks(question_dict, student_answer_num, analysis)
     except Exception:
         logger.exception("Rule-based analysis also failed; using pure fallback.")

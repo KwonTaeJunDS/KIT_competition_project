@@ -5,7 +5,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import exists, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.database import get_db
@@ -55,9 +55,9 @@ def get_today(user_id: str | None = None, db: Session = Depends(get_db)):
                 WeaknessProfile.updated_at.desc(),
                 WeaknessProfile.concept_key.asc(),
             )
-            .limit(3)
+            .limit(10)
         ).scalars().all()
-        weak_topics = [_format_topic_label(key) for key in weak_rows if _format_topic_label(key)]
+        weak_topics = _top_topic_labels(weak_rows, limit=3)
     else:
         review_count = 0
         new_count = db.execute(select(func.count(Question.id))).scalar_one()
@@ -90,3 +90,19 @@ def _format_topic_label(concept_key: object) -> str:
     if not era or era == "미분류":
         return concept
     return f"{era} {concept}"
+
+
+def _top_topic_labels(keys: list[str], limit: int = 3) -> list[str]:
+    topics: list[str] = []
+    seen: set[str] = set()
+
+    for key in keys:
+        label = _format_topic_label(key)
+        if not label or label in seen:
+            continue
+        topics.append(label)
+        seen.add(label)
+        if len(topics) >= limit:
+            break
+
+    return topics
