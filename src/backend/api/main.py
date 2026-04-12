@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import init_db
-from api.routers import questions, attempts, today, error_notes, review_queue
+from api.routers import questions, attempts, today, error_notes, review_queue, admin
 
 
 @asynccontextmanager
@@ -44,6 +44,7 @@ app.include_router(questions.router,    prefix="/api/v1")
 app.include_router(attempts.router,     prefix="/api/v1")
 app.include_router(error_notes.router,  prefix="/api/v1")
 app.include_router(review_queue.router, prefix="/api/v1")
+app.include_router(admin.router,        prefix="/api/v1")
 
 
 @app.get("/health")

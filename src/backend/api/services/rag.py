@@ -2,6 +2,7 @@
 services/rag.py — KoreanHistoryRAG 싱글톤 래퍼
 03_query_test.py의 KoreanHistoryRAG를 절대경로로 임포트해 재사용.
 """
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -10,21 +11,20 @@ _RAG_MODULE_DIR = Path(__file__).parent.parent.parent / "korean_history_rag"
 if str(_RAG_MODULE_DIR) not in sys.path:
     sys.path.insert(0, str(_RAG_MODULE_DIR))
 
-# RAG 인덱스 경로를 절대경로로 패치
-import importlib
-import types
-
-# 03_query_test.py를 동적으로 로드하되 RAG_DIR만 수정
-_rag_source = (_RAG_MODULE_DIR / "03_query_test.py").read_text(encoding="utf-8")
-_rag_module = types.ModuleType("rag_engine")
-_rag_module.__file__ = str(_RAG_MODULE_DIR / "03_query_test.py")
-
-# RAG_DIR을 절대경로로 교체
-_rag_source = _rag_source.replace(
-    'RAG_DIR       = Path("output/rag")',
-    f'RAG_DIR       = Path(r"{_RAG_MODULE_DIR / "output" / "rag"}")',
+# 03_query_test.py를 importlib로 정상 로드
+_spec = importlib.util.spec_from_file_location(
+    "rag_engine",
+    _RAG_MODULE_DIR / "03_query_test.py",
 )
-exec(compile(_rag_source, _rag_module.__file__, "exec"), _rag_module.__dict__)
+_rag_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_rag_module)
+
+# 경로 상수를 절대경로로 교체 (KoreanHistoryRAG() 인스턴스화 전이므로 안전)
+_RAG_DIR_ABS = _RAG_MODULE_DIR / "output" / "rag"
+_rag_module.RAG_DIR       = _RAG_DIR_ABS
+_rag_module.FAISS_PATH    = _RAG_DIR_ABS / "faiss.index"
+_rag_module.METADATA_PATH = _RAG_DIR_ABS / "metadata.json"
+_rag_module.BM25_PATH     = _RAG_DIR_ABS / "bm25.pkl"
 
 KoreanHistoryRAG = _rag_module.KoreanHistoryRAG
 ErrorAnalyzerBase = _rag_module.ErrorAnalyzer

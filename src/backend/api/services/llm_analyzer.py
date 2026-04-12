@@ -135,7 +135,7 @@ def _call_ollama(prompt: str) -> dict | None:
 def _call_google(prompt: str) -> dict | None:
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{GOOGLE_MODEL}:generateContent?key={GOOGLE_API_KEY}"
+        f"{GOOGLE_MODEL}:generateContent"
     )
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
@@ -148,7 +148,10 @@ def _call_google(prompt: str) -> dict | None:
 
     req = urllib.request.Request(
         url, data=payload,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": GOOGLE_API_KEY,
+        },
         method="POST",
     )
     try:
