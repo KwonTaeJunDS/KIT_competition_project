@@ -2,6 +2,7 @@
 main.py — FastAPI 앱 진입점
 실행: uvicorn api.main:app --reload --port 8000
 """
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,13 +17,31 @@ from api.database import init_db
 from api.routers import questions, attempts, today, error_notes, review_queue, admin
 
 
+def _parse_origin_list(raw: str | None) -> list[str]:
+    return [origin.strip().rstrip("/") for origin in (raw or "").split(",") if origin.strip()]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 시작 시: 테이블 생성 + RAG 인덱스 로드
+    # 시작 시: 테이블 생성. RAG는 필요할 때만 로드하도록 기본값을 둔다.
     init_db()
-    from api.services.rag import get_rag  # noqa: F401 — 싱글톤 초기화
-    get_rag()
+
+    eager_load_rag = os.getenv("EAGER_LOAD_RAG", "0") == "1"
+    if eager_load_rag:
+        from api.services.rag import get_rag  # noqa: F401 — 싱글톤 초기화
+        get_rag()
     yield
+
+
+default_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+extra_origins = _parse_origin_list(os.getenv("CORS_ALLOW_ORIGINS"))
+allow_origins = list(dict.fromkeys([*default_origins, *extra_origins]))
+allow_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX") or None
 
 
 app = FastAPI(
@@ -33,12 +52,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origins=allow_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

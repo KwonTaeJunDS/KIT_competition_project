@@ -23,4 +23,4 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python -m api.scripts.seed_db && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
