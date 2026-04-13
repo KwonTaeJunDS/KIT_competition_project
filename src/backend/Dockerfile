@@ -19,9 +19,6 @@ COPY api/ ./api/
 COPY korean_history_rag/03_query_test.py ./korean_history_rag/03_query_test.py
 COPY korean_history_rag/output/ ./korean_history_rag/output/
 
-# 모델 다운로드 (빌드 시 1회 캐시)
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('jhgan/ko-sroberta-multitask')"
-
 EXPOSE 8000
 
 CMD ["sh", "-c", "python -m api.scripts.seed_db && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

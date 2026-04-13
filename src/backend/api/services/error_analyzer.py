@@ -6,15 +6,40 @@ Phase 5: LLM(Gemma) 우선 → rule-based → pure fallback 순서.
 """
 
 import logging
-
-from api.services.rag import ErrorAnalyzerBase, get_rag
+import os
 
 logger = logging.getLogger(__name__)
-_analyzer = ErrorAnalyzerBase()
+_analyzer = None
+
+
+def _rag_analysis_enabled() -> bool:
+    """Default to safe fallback mode in deploys unless RAG analysis is explicitly enabled."""
+    raw = os.getenv("ENABLE_RAG_ANALYSIS", os.getenv("EAGER_LOAD_RAG", "0"))
+    return raw == "1"
+
+
+def _get_rule_based_analyzer():
+    """Import the RAG-backed analyzer lazily so app startup does not depend on FAISS artifacts."""
+    global _analyzer
+    if _analyzer is not None:
+        return _analyzer
+
+    try:
+        from api.services.rag import ErrorAnalyzerBase
+    except Exception:
+        logger.debug("RAG analyzer import failed; pure fallback will be used.", exc_info=True)
+        return None
+
+    _analyzer = ErrorAnalyzerBase()
+    return _analyzer
 
 
 def analyze_error(question_dict: dict, student_answer_num: int) -> dict:
     """오답 분석. GraphRAG(Gemma+그래프) → rule-based → pure fallback 순으로 시도."""
+    if not _rag_analysis_enabled():
+        logger.info("RAG analysis disabled; using pure fallback error analysis.")
+        return _build_fallback_analysis(question_dict, student_answer_num)
+
     # ── GraphRAG: FAISS + 온톨로지 + Gemma (Gemma 실패 시 내부 규칙 기반 fallback) ──
     try:
         from api.services.graphrag import graphrag_available, get_graphrag
@@ -28,12 +53,18 @@ def analyze_error(question_dict: dict, student_answer_num: int) -> dict:
 
     # ── rule-based fallback ────────────────────────────────────
     try:
-        rag_svc  = get_rag()
-        analysis = _analyzer.analyze(question_dict, student_answer_num, rag_svc)
-        return _merge_with_fallbacks(question_dict, student_answer_num, analysis)
+        analyzer = _get_rule_based_analyzer()
+        if analyzer is not None:
+            from api.services.rag import get_rag
+
+            rag_svc  = get_rag()
+            analysis = analyzer.analyze(question_dict, student_answer_num, rag_svc)
+            return _merge_with_fallbacks(question_dict, student_answer_num, analysis)
     except Exception:
         logger.exception("Rule-based analysis also failed; using pure fallback.")
-        return _build_fallback_analysis(question_dict, student_answer_num)
+
+    logger.warning("Using pure fallback error analysis because RAG services are unavailable.")
+    return _build_fallback_analysis(question_dict, student_answer_num)
 
 
 def question_to_dict(q) -> dict:
