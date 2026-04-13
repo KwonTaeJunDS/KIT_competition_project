@@ -25,6 +25,7 @@ services:
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
+    profiles: ["llm"]
     volumes:
       - ollama_data:/root/.ollama
     ports:
@@ -47,11 +48,14 @@ services:
     environment:
       DATABASE_URL:  postgresql://${POSTGRES_USER:-raguser}:${POSTGRES_PASSWORD:-ragpass}@db:5432/${POSTGRES_DB:-history_rag}
       # Phase 5: Gemma LLM 설정
-      OLLAMA_URL:    ${OLLAMA_URL:-http://ollama:11434}
+      ADMIN_SECRET: ${ADMIN_SECRET:-demo-admin-secret}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      OLLAMA_URL: ${OLLAMA_URL:-}
       GEMMA_MODEL:   ${GEMMA_MODEL:-gemma3:27b}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GOOGLE_MODEL:  ${GOOGLE_MODEL:-gemma-3-27b-it}
-      LLM_TIMEOUT_SEC: ${LLM_TIMEOUT_SEC:-30}
+      LLM_TIMEOUT_SEC: ${LLM_TIMEOUT_SEC:-5}
+      EAGER_LOAD_RAG: ${EAGER_LOAD_RAG:-0}
     ports:
       - "8000:8000"
     depends_on:
@@ -67,9 +71,15 @@ services:
     build:
       context: ./src/frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+        NEXT_PUBLIC_USE_MOCK: ${NEXT_PUBLIC_USE_MOCK:-0}
+        NEXT_PUBLIC_DEMO_USER_ID: ${NEXT_PUBLIC_DEMO_USER_ID:-demo-user-001}
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_BASE: http://backend:8000
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+      NEXT_PUBLIC_USE_MOCK: ${NEXT_PUBLIC_USE_MOCK:-0}
+      NEXT_PUBLIC_DEMO_USER_ID: ${NEXT_PUBLIC_DEMO_USER_ID:-demo-user-001}
     ports:
       - "3000:3000"
     depends_on:

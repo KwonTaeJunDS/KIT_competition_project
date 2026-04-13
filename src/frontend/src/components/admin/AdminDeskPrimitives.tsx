@@ -454,3 +454,31 @@ export function AdminActionConsole({
     </div>
   );
 }
+
+export function AdminStatusBanner({
+  title,
+  message,
+  tone = "neutral",
+}: {
+  title: string;
+  message: string;
+  tone?: "neutral" | "warning" | "danger" | "ok";
+}) {
+  const toneClass =
+    tone === "warning"
+      ? "border-[#6a5730] bg-[#191611] text-amber-50"
+      : tone === "danger"
+        ? "border-[#6a352d] bg-[#191212] text-rose-100"
+        : tone === "ok"
+          ? "border-[#355247] bg-[#14201b] text-emerald-50"
+          : "border-stone-800 bg-black/20 text-stone-200";
+
+  return (
+    <div className={cn("rounded-[20px] border px-4 py-4", toneClass)}>
+      <div className="text-[11px] font-semibold tracking-[0.08em] text-stone-500">
+        {title}
+      </div>
+      <p className="mt-2 text-[13px] leading-6">{message}</p>
+    </div>
+  );
+}

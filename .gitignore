@@ -42,6 +42,7 @@ src/frontend/.ai/
 CLAUDE.md
 PLAN.md
 src/frontend_old/
+src/backend/_codex_verify.py
 
 # Local agent / notes
 .ai/

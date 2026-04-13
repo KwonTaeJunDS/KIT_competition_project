@@ -28,6 +28,15 @@ export type AdminDashboardData = {
   studentLeakDetails: StudentLeakDetail[];
 };
 
+export type AdminDashboardMode = "live" | "mock" | "empty" | "unavailable";
+
+export type AdminDashboardLoadResult = {
+  data: AdminDashboardData;
+  source: "api" | "mock";
+  mode: AdminDashboardMode;
+  message: string;
+};
+
 export type OntologyDraftData = {
   taskId: string;
   title: string;
@@ -36,6 +45,16 @@ export type OntologyDraftData = {
   edgesPreview: OntologyEditTask["edgesPreview"];
   updatedAt: string | null;
   storage: "api" | "local";
+};
+
+export const EMPTY_ADMIN_DASHBOARD_DATA: AdminDashboardData = {
+  summaryCards: [],
+  students: [],
+  ontologyTasks: [],
+  deliveryGaps: [],
+  hotspotClusters: [],
+  sourceQueue: [],
+  studentLeakDetails: [],
 };
 
 function readLocalDraftMap(): Record<string, OntologyDraftData> {
@@ -99,21 +118,58 @@ export function getMockAdminDashboardData(): AdminDashboardData {
   };
 }
 
-export async function getAdminDashboardData(): Promise<AdminDashboardData> {
+export async function loadAdminDashboardData(): Promise<AdminDashboardLoadResult> {
   if (USE_MOCK) {
-    return getMockAdminDashboardData();
+    return {
+      data: getMockAdminDashboardData(),
+      source: "mock",
+      mode: "mock",
+      message:
+        "NEXT_PUBLIC_USE_MOCK=1이라 관리자 화면은 mock 데이터를 사용합니다.",
+    };
   }
 
   try {
     const data = await fetchApi<AdminDashboardData>("/api/v1/admin/dashboard-data");
-    if (!data.students?.length) {
-      return getMockAdminDashboardData();
+
+    if (
+      !data.students.length &&
+      !data.ontologyTasks.length &&
+      !data.deliveryGaps.length &&
+      !data.hotspotClusters.length &&
+      !data.sourceQueue.length
+    ) {
+      return {
+        data: EMPTY_ADMIN_DASHBOARD_DATA,
+        source: "api",
+        mode: "empty",
+        message:
+          "관리자 read-model API는 연결되었지만 아직 표시할 집계 데이터가 없습니다.",
+      };
     }
-    return data;
+
+    return {
+      data,
+      source: "api",
+      mode: "live",
+      message: "관리자 화면은 실백엔드 read-model API 데이터를 사용합니다.",
+    };
   } catch (error) {
-    console.error("[Admin API fallback]", error);
-    return getMockAdminDashboardData();
+    console.error("[Admin API unavailable]", error);
+    return {
+      data: EMPTY_ADMIN_DASHBOARD_DATA,
+      source: "api",
+      mode: "unavailable",
+      message:
+        error instanceof Error
+          ? `관리자 read-model API를 불러오지 못했습니다: ${error.message}`
+          : "관리자 read-model API를 불러오지 못했습니다.",
+    };
   }
+}
+
+export async function getAdminDashboardData(): Promise<AdminDashboardData> {
+  return (await loadAdminDashboardData()).data;
 }
 
 export function getAdminStudentLeakDetail(

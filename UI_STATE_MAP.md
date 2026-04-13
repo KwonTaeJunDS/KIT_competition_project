@@ -1,238 +1,78 @@
-# UI_STATE_MAP.md
+﻿# UI_STATE_MAP.md
 
-> **Frontend owner:** 팀원
-> **목적:** 각 화면의 상태 분기와 화면 전환 흐름 정의
-> **Rule:** 상태 추가/변경 시 이 문서 업데이트
+> Last updated: 2026-04-13
 
----
+## 현재 라우트
 
-## 라우트 구조
+- `/today`: 학생 오늘 화면
+- `/solve`: 학생 문제 풀이 + 제출 결과 시트
+- `/notes`: 학생 오답노트
+- `/review`: 학생 복습 큐
+- `/admin`: 관리자 대시보드
+- `/admin/students`: 관리자 학생 개입면
+- `/admin/students/[studentId]`: 관리자 학생 상세
+- `/admin/ontology`: 관리자 온톨로지 workbench
 
-```
-/                   → 오늘의 학습 홈 (Today)
-/solve              → 문제 세트 선택
-/solve/[setId]      → 문제 풀이
-/result/[attemptId] → 풀이 결과 (오답 분석)
-/notes              → 오답노트 목록
-/notes/[noteId]     → 오답노트 상세
-/review             → 오늘 복습 큐
-/profile            → 취약 개념 프로필
-```
+## 학생 화면 상태
 
----
+### `/today`
+- `loading`: 카드 skeleton
+- `success`: 오늘 복습 수, 새 문제 수, 취약 주제 노출
+- `empty`: weak topic이 없거나 counts가 0이어도 빈 상태 카드로 처리
+- `error`: API 오류 메시지와 재시도
 
-## 화면별 상태 정의
+### `/solve`
+- `loading`: 문항 상세 로딩
+- `ready`: 보기 선택 전
+- `selected`: 답안 선택 후 제출 가능
+- `submitting`: 답안 제출 중
+- `result-sheet`: 정답/오답 해설과 다음 행동 표시
+- `error`: 제출 실패 또는 문항 fetch 실패
 
----
+### `/notes`
+- `loading`
+- `success`
+- `empty`: 오답노트 없음
+- `error`
 
-### 1. `/` — Today 홈
+### `/review`
+- `loading`
+- `success`: due 또는 includeAll 기준 항목 표시
+- `empty`: 보여줄 복습 큐 없음
+- `error`
 
-**상태 분기**
+## 관리자 화면 상태
 
-| 상태 | 조건 | UI |
-|------|------|----|
-| loading | API 호출 중 | 스켈레톤 카드 3개 |
-| success | 데이터 정상 | 복습 카운트 + 취약 개념 Top 3 |
-| empty | review_count = 0 | "오늘 복습할 문항이 없어요" + 새 문제 시작 버튼 |
-| error | API 실패 | "불러오기 실패" + 재시도 버튼 |
+### `/admin`
+- `loading`: 관리자 read-model 상태 확인 중
+- `live`: 실백엔드 read-model
+- `mock`: `NEXT_PUBLIC_USE_MOCK=1`일 때만 허용
+- `empty`: read-model 연결은 됐지만 집계가 비어 있음
+- `unavailable`: API 실패, mock으로 치환하지 않음
 
-**화면 전환**
+### `/admin/students`
+- `loading`: 학생 개입 큐 로딩
+- `live`: 실 read-model 기반 큐
+- `mock`: 명시적 mock 모드
+- `empty`: 학생 큐 없음
+- `unavailable`: API 실패, 빈 상태 유지
 
-```
-오늘 복습 시작 버튼  →  /review
-새 문제 풀기 버튼    →  /solve
-취약 개념 카드 탭    →  /solve?era={era}
-```
+### `/admin/students/[studentId]`
+- `live`: 학생 상세 표시
+- `mock`: 명시적 mock 모드 상세
+- `empty/unavailable`: 상세 대신 상태 안내 패널
+- `notFound`: 선택한 학생 ID가 실제 데이터에도 없음
 
-**Mock JSON**
-```json
-{
-  "today_review_count": 12,
-  "today_new_count": 20,
-  "weak_topics": ["조선 후기 개혁", "개항기 정책", "독립운동 단체"]
-}
-```
+### `/admin/ontology`
+- `live`: 실데이터 기반 편집 후보와 영향 미리보기
+- `mock`: 명시적 mock workbench
+- `empty`: 편집 후보 없음
+- `unavailable`: 관리자 API 실패, 빈 workbench 유지
 
----
+## 관리자 온톨로지 저장 규칙
 
-### 2. `/solve` — 문제 세트 선택
-
-**상태 분기**
-
-| 상태 | 조건 | UI |
-|------|------|----|
-| loading | 목록 로딩 중 | 카드 스켈레톤 |
-| success | 문항 목록 있음 | 시대별 필터 + 문항 카드 리스트 |
-| empty | 필터 결과 없음 | "해당 조건의 문항이 없어요" |
-| error | API 실패 | 재시도 버튼 |
-
-**화면 전환**
-```
-문제 카드 탭  →  /solve/[setId]
-```
-
----
-
-### 3. `/solve/[setId]` — 문제 풀이
-
-**상태 분기**
-
-| 상태 | 조건 | UI |
-|------|------|----|
-| loading | 문항 로딩 중 | 스켈레톤 |
-| idle | 문항 로드 완료, 미선택 | 보기 버튼 활성, 제출 버튼 비활성 |
-| selected | 보기 선택됨 | 선택한 보기 하이라이트, 제출 버튼 활성 |
-| submitting | 제출 API 호출 중 | 제출 버튼 로딩 스피너 |
-| submitted | 응답 도착 | 결과 화면으로 자동 이동 |
-| error | API 실패 | "제출 실패" 토스트 + 재시도 |
-
-**화면 전환**
-```
-제출 완료  →  /result/[attemptId]
-나가기     →  /solve (진행 중 경고 모달)
-```
-
-**Mock JSON (문항)**
-```json
-{
-  "id": "uuid-001",
-  "round": 77,
-  "q_num": 25,
-  "stem": "다음 중 흥선대원군의 정책으로 옳은 것은?",
-  "choices": [
-    {"key": "①", "text": "균역법 실시"},
-    {"key": "②", "text": "대동법 시행"},
-    {"key": "③", "text": "서원 철폐"},
-    {"key": "④", "text": "영정법 실시"},
-    {"key": "⑤", "text": "호패법 시행"}
-  ],
-  "score": 2,
-  "era_tags": ["조선후기"]
-}
-```
-
----
-
-### 4. `/result/[attemptId]` — 풀이 결과
-
-**상태 분기**
-
-| 상태 | 조건 | UI |
-|------|------|----|
-| loading | 결과 로딩 중 | 스켈레톤 |
-| correct | is_correct = true | 초록 뱃지 + 핵심 사실 + 암기 힌트 |
-| incorrect | is_correct = false | 빨간 뱃지 + 오답 유형 + 왜 틀렸는지 + 오답노트 저장 완료 알림 |
-| error | API 실패 | 재시도 버튼 |
-
-**화면 전환**
-```
-다음 문제    →  /solve/[nextSetId]
-오답노트 보기 →  /notes/[noteId]  (오답일 때만)
-홈으로       →  /
-```
-
-**Mock JSON (오답)**
-```json
-{
-  "is_correct": false,
-  "correct_answer": "③",
-  "answer_text": "서원 철폐",
-  "explanation_summary": "흥선대원군은 서원을 철폐하여 왕권을 강화하였다.",
-  "error_type": "정책/제도 혼동",
-  "wrong_units": ["개혁 조치 식별"],
-  "why_wrong": "대표 정책을 다른 시기의 제도와 혼동했다.",
-  "correct_fact": "흥선대원군의 핵심 개혁 중 하나는 서원 철폐다.",
-  "memory_hint": "서원 철폐 = 왕권 강화",
-  "note_saved": true,
-  "note_id": "uuid-note-001"
-}
-```
-
----
-
-### 5. `/notes` — 오답노트 목록
-
-**상태 분기**
-
-| 상태 | 조건 | UI |
-|------|------|----|
-| loading | 목록 로딩 중 | 카드 스켈레톤 |
-| success | 노트 있음 | 필터 바 + 카드 리스트 |
-| empty | 노트 없음 | "아직 오답노트가 없어요" + 문제 풀러 가기 버튼 |
-| error | API 실패 | 재시도 버튼 |
-
-**필터 옵션**
-```
-시대: 전체 / 선사 / 고조선 / 삼국 / 남북국 / 고려 / 조선전기 / 조선후기 / 근대 / 일제강점기 / 현대
-오답유형: 전체 / 시대 혼동 / 인물-사건 매칭 오류 / 정책·제도 혼동 / ...
-```
-
-**화면 전환**
-```
-카드 탭  →  /notes/[noteId]
-복습 시작 버튼  →  /review
-```
-
----
-
-### 6. `/notes/[noteId]` — 오답노트 상세
-
-**상태 분기**
-
-| 상태 | 조건 | UI |
-|------|------|----|
-| loading | 로딩 중 | 스켈레톤 |
-| success | 데이터 있음 | 문제 원문 + 오답 분석 + 복습 카드(앞/뒤) |
-| error | 없는 ID | "노트를 찾을 수 없어요" + 목록으로 버튼 |
-
-**화면 전환**
-```
-다시 풀기  →  /solve/[question_id]
-목록으로   →  /notes
-```
-
----
-
-### 7. `/review` — 오늘 복습 큐
-
-**상태 분기**
-
-| 상태 | 조건 | UI |
-|------|------|----|
-| loading | 로딩 중 | 스켈레톤 |
-| success | due 문항 있음 | 진행률 바 + 복습 카드 |
-| empty | due 문항 없음 | "오늘 복습 완료! 🎉" + 홈으로 버튼 |
-| error | API 실패 | 재시도 버튼 |
-
-**화면 전환**
-```
-복습 카드 정답/오답 선택  →  다음 카드 or 완료 화면
-완료  →  /
-```
-
----
-
-### 8. `/profile` — 취약 개념 프로필
-
-**상태 분기**
-
-| 상태 | 조건 | UI |
-|------|------|----|
-| loading | 로딩 중 | 스켈레톤 |
-| success | 데이터 있음 | weakness_score 기준 바 차트 |
-| empty | 풀이 기록 없음 | "문제를 풀면 약점이 분석돼요" |
-| error | API 실패 | 재시도 버튼 |
-
-**화면 전환**
-```
-개념 바 탭  →  /solve?era={concept_key}
-```
-
----
-
-## 공통 컴포넌트 상태
-
-**로딩 스켈레톤** — API 호출 시 항상 표시
-**에러 토스트** — API 실패 시 하단 토스트
-**빈 상태 일러스트** — empty 상태 공통 컴포넌트
-**뒤로가기** — 모든 화면에서 이전 화면으로
+- workbench는 draft 저장만 다룹니다.
+- draft 저장은 서버 우선입니다.
+- 서버 draft 저장 실패 시 같은 브라우저의 localStorage draft로 fallback합니다.
+- 이 fallback은 관리자 온톨로지 화면에만 허용됩니다.
+- 대시보드/학생 개입면 read-model은 실패 시 mock으로 덮지 않습니다.
