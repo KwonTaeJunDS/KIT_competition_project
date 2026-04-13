@@ -3,11 +3,12 @@ routers/questions.py
 GET /api/v1/questions          — 문제 목록 (필터: topic, era, limit)
 GET /api/v1/questions/{id}     — 문제 상세 (answer 절대 미반환)
 """
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.database import get_db
+from api.models.attempt import Attempt
 from api.models.question import Question
 from api.schemas.question import (
     ChoiceItem,
@@ -55,6 +56,10 @@ def list_questions(
     topic: str | None = None,
     era:   str | None = None,
     limit: int = 20,
+    user_id: str | None = None,
+    exclude_attempted: bool = False,
+    exclude_question_ids: list[str] | None = Query(default=None),
+    shuffle: bool = False,
     db: Session = Depends(get_db),
 ):
     stmt = select(Question)
@@ -66,6 +71,25 @@ def list_questions(
 
     if era:
         stmt = stmt.where(Question.era_tags.cast(str).contains(era))
+
+    excluded_ids = [question_id for question_id in (exclude_question_ids or []) if question_id]
+    if excluded_ids:
+        stmt = stmt.where(~Question.id.in_(excluded_ids))
+
+    if user_id and exclude_attempted:
+        attempted_question_ids = (
+            select(Attempt.question_id)
+            .where(
+                Attempt.user_id == user_id,
+                Attempt.question_id.is_not(None),
+            )
+        )
+        stmt = stmt.where(~Question.id.in_(attempted_question_ids))
+
+    if shuffle:
+        stmt = stmt.order_by(func.random())
+    else:
+        stmt = stmt.order_by(Question.round.asc(), Question.q_num.asc(), Question.id.asc())
 
     stmt = stmt.limit(limit)
     rows = db.execute(stmt).scalars().all()

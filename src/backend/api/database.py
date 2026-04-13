@@ -43,5 +43,12 @@ def init_db():
     SQLAlchemy ORM 기반 테이블 자동 생성.
     Postgres 운영 환경에서는 migrations/001_init_schema.sql 사용 권장.
     """
-    from api.models import question, attempt, error_note, review_queue, weakness_profile  # noqa: F401
+    from api.models import (  # noqa: F401
+        question,
+        attempt,
+        error_note,
+        ontology_draft,
+        review_queue,
+        weakness_profile,
+    )
     Base.metadata.create_all(bind=engine)

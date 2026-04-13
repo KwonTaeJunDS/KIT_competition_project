@@ -33,7 +33,11 @@ def _to_utc_z(dt: datetime | None) -> str | None:
 
 
 @router.get("/review-queue", response_model=dict)
-def list_review_queue(user_id: str, db: Session = Depends(get_db)):
+def list_review_queue(
+    user_id: str,
+    include_all: bool = False,
+    db: Session = Depends(get_db),
+):
     now = datetime.now(timezone.utc)
 
     stmt = (
@@ -43,10 +47,13 @@ def list_review_queue(user_id: str, db: Session = Depends(get_db)):
         .where(
             ReviewQueue.user_id == user_id,
             ReviewQueue.status == "pending",
-            ReviewQueue.due_at <= now,
         )
-        .order_by(ReviewQueue.due_at.asc(), ReviewQueue.created_at.asc())
     )
+
+    if not include_all:
+        stmt = stmt.where(ReviewQueue.due_at <= now)
+
+    stmt = stmt.order_by(ReviewQueue.due_at.asc(), ReviewQueue.created_at.asc())
 
     rows = db.execute(stmt).all()
     items = [
@@ -105,19 +112,6 @@ def complete_review(
                 "error": {
                     "code": "ALREADY_COMPLETED",
                     "message": "이미 완료 처리된 항목입니다.",
-                },
-            },
-        )
-
-    due_at = queue.due_at.replace(tzinfo=timezone.utc) if queue.due_at.tzinfo is None else queue.due_at.astimezone(timezone.utc)
-    if due_at > now:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "success": False,
-                "error": {
-                    "code": "REVIEW_NOT_DUE",
-                    "message": "아직 복습할 시간이 되지 않은 항목입니다.",
                 },
             },
         )

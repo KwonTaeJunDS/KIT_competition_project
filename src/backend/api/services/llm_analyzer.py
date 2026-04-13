@@ -18,7 +18,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # ── 환경변수 ─────────────────────────────────────────────────
-OLLAMA_URL   = os.getenv("OLLAMA_URL",    "http://localhost:11434")
+OLLAMA_URL   = os.getenv("OLLAMA_URL",    "").strip()
 GEMMA_MODEL  = os.getenv("GEMMA_MODEL",   "gemma3:27b")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GOOGLE_MODEL = os.getenv("GOOGLE_MODEL",  "gemma-3-27b-it")
@@ -107,6 +107,9 @@ JSON 외 다른 텍스트는 절대 출력하지 마세요.
 
 # ── Ollama 호출 ──────────────────────────────────────────────
 def _call_ollama(prompt: str) -> dict | None:
+    if not OLLAMA_URL:
+        return None
+
     url = f"{OLLAMA_URL.rstrip('/')}/api/generate"
     payload = json.dumps({
         "model": GEMMA_MODEL,

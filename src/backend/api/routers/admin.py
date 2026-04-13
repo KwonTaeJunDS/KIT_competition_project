@@ -9,29 +9,127 @@ Admin 전용 엔드포인트 (인증: X-Admin-Key 헤더)
 
 import logging
 import os
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, Security, UploadFile
 from fastapi.security.api_key import APIKeyHeader
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from api.database import get_db
+from api.models.ontology_draft import OntologyDraft
+from api.services.admin_dashboard import build_admin_dashboard_bundle
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-# ── 인증 ──────────────────────────────────────────────────────
-_ADMIN_SECRET = os.getenv("ADMIN_SECRET")
-if not _ADMIN_SECRET:
-    raise RuntimeError(
-        "ADMIN_SECRET 환경변수가 설정되지 않았습니다. "
-        ".env 또는 환경변수에 ADMIN_SECRET=<강력한 시크릿>을 추가하세요."
+
+class OntologyDraftNodePayload(BaseModel):
+    id: str
+    label: str
+    role: str
+    note: str
+
+
+class OntologyDraftEdgePayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_node: str = Field(alias="from")
+    to: str
+    label: str
+    status: str
+
+    def to_public_dict(self) -> dict[str, str]:
+        return {
+            "from": self.from_node,
+            "to": self.to,
+            "label": self.label,
+            "status": self.status,
+        }
+
+
+class OntologyDraftUpsertRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    title: str = ""
+    era: str = ""
+    nodes_preview: list[OntologyDraftNodePayload] = Field(
+        alias="nodesPreview",
+        default_factory=list,
     )
+    edges_preview: list[OntologyDraftEdgePayload] = Field(
+        alias="edgesPreview",
+        default_factory=list,
+    )
+
+
+def _serialize_draft(draft: OntologyDraft) -> dict:
+    return {
+        "taskId": draft.task_id,
+        "title": draft.title,
+        "era": draft.era,
+        "nodesPreview": draft.nodes_preview or [],
+        "edgesPreview": draft.edges_preview or [],
+        "updatedAt": (
+            draft.updated_at.astimezone(timezone.utc).isoformat()
+            if draft.updated_at
+            else None
+        ),
+        "storage": "api",
+    }
+
+# ── 인증 ──────────────────────────────────────────────────────
+_ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 _api_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
 
 
+@router.get("/dashboard-data", response_model=dict)
+def get_admin_dashboard_data(db: Session = Depends(get_db)):
+    """Admin read model used by the teacher-facing dashboard pages."""
+    return {
+        "success": True,
+        "data": build_admin_dashboard_bundle(db),
+    }
+
+
+@router.get("/ontology-drafts/{task_id}", response_model=dict)
+def get_ontology_draft(task_id: str, db: Session = Depends(get_db)):
+    draft = db.get(OntologyDraft, task_id)
+    return {
+        "success": True,
+        "data": _serialize_draft(draft) if draft else None,
+    }
+
+
+@router.post("/ontology-drafts/{task_id}", response_model=dict)
+def save_ontology_draft(
+    task_id: str,
+    body: OntologyDraftUpsertRequest,
+    db: Session = Depends(get_db),
+):
+    draft = db.get(OntologyDraft, task_id)
+    if draft is None:
+        draft = OntologyDraft(task_id=task_id)
+
+    draft.title = body.title.strip() or task_id
+    draft.era = body.era.strip()
+    draft.nodes_preview = [node.model_dump() for node in body.nodes_preview]
+    draft.edges_preview = [edge.to_public_dict() for edge in body.edges_preview]
+    draft.updated_at = datetime.now(timezone.utc)
+
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+
+    return {
+        "success": True,
+        "data": _serialize_draft(draft),
+    }
+
+
 def _require_admin(api_key: str = Security(_api_key_header)):
-    if not api_key or api_key != _ADMIN_SECRET:
+    if not _ADMIN_SECRET or not api_key or api_key != _ADMIN_SECRET:
         raise HTTPException(
             status_code=403,
             detail={

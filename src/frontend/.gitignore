@@ -1,0 +1,42 @@
+# 환경 변수
+.env
+*.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# SQLite DB (로컬 개발용)
+*.db
+
+# Next.js
+.next/
+node_modules/
+out/
+tsconfig.tsbuildinfo
+src/frontend/.next/
+src/frontend/node_modules/
+src/frontend/out/
+
+# Sentence Transformers 모델 캐시
+~/.cache/huggingface/
+
+# macOS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local AI workspace notes
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+src/frontend/AGENTS.md
+src/frontend/CLAUDE.md

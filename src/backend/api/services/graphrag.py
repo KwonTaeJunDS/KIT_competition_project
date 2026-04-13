@@ -44,7 +44,7 @@ _REQUIRED_ARTIFACTS = (
 )
 
 # ── Gemma 설정 ─────────────────────────────────────────────────
-OLLAMA_URL  = os.getenv("OLLAMA_URL",   "http://localhost:11434")
+OLLAMA_URL  = os.getenv("OLLAMA_URL",   "").strip()
 GEMMA_MODEL = os.getenv("GEMMA_MODEL",  "gemma3:4b")
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT_SEC", "30"))
 EMBED_MODEL = "jhgan/ko-sroberta-multitask"
@@ -99,6 +99,9 @@ _TAXONOMY_MAP = {
 
 def _call_gemma_ollama(context: dict) -> dict | None:
     """Ollama REST API로 Gemma 오답 분석 호출."""
+    if not OLLAMA_URL:
+        return None
+
     similar_lines = "\n".join(
         f"- {q['stem'][:50]}... (정답: {q.get('answer', '')})"
         for q in context.get("similar", [])[:3]

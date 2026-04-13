@@ -1,6 +1,8 @@
 # 환경 변수
 .env
 *.env
+**/.env.local
+**/.env.local
 
 # Python
 __pycache__/
@@ -14,11 +16,15 @@ build/
 
 # SQLite DB (로컬 개발용)
 *.db
+*.db-journal
+*.db-journal
 
 # Next.js
 src/frontend/.next/
 src/frontend/node_modules/
 src/frontend/out/
+src/frontend/.vercel/
+src/frontend/.vercel/
 
 # Sentence Transformers 모델 캐시
 ~/.cache/huggingface/
@@ -28,3 +34,16 @@ src/frontend/out/
 .idea/
 .vscode/
 *.swp
+
+# Local agent / notes
+.ai/
+.claude/
+src/frontend/.ai/
+CLAUDE.md
+PLAN.md
+src/frontend_old/
+
+# Local agent / notes
+.ai/
+.claude/
+src/frontend/.ai/
