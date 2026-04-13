@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 소스 복사
 COPY api/ ./api/
+COPY korean_history_rag/03_query_test.py ./korean_history_rag/03_query_test.py
 COPY korean_history_rag/output/ ./korean_history_rag/output/
 
 # 모델 다운로드 (빌드 시 1회 캐시)
